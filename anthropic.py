@@ -212,4 +212,5 @@ async def _anthropic_stream(
             await resp.aclose()
         errors.append(error or f"{provider}: HTTP {resp.status_code if resp else '?'}")
 
-    yield f"event: error\ndata: {json.dumps({'type':'error','error':{'type':'api_error','message':f'All routes exhausted: {\"; \".join(errors[-3:])}'}})}\n\n"
+    msg = f"All routes exhausted: {'; '.join(errors[-3:])}"
+    yield f"event: error\ndata: {json.dumps({'type':'error','error':{'type':'api_error','message':msg}})}\n\n"
