@@ -19,7 +19,7 @@ PROVIDERS: dict[str, dict[str, str]] = {
 
 MODEL_PROVIDER_MAP: dict[str, list[str]] = {
     "openai": ["pollinations"],
-    "gpt": ["pollinations"],
+    "gpt": ["pollinations", "deepinfra"],
     "deepseek": ["deepinfra", "pollinations"],
     "claude": ["pollinations"],
     "gemini": ["pollinations"],

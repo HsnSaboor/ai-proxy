@@ -64,6 +64,9 @@ def resolve_routes(model_name: str) -> list[tuple[str, str]]:
     for prov in providers:
         upstream = get_upstream_model(stripped, prov)
         routes.append((prov, upstream))
+    if stripped in ("deepseek-v4-pro", "deepseek-v4"):
+        flash = get_upstream_model("deepseek-v4-flash", "deepinfra")
+        routes.append(("deepinfra", flash))
     if not any(p == "pollinations" for p, _ in routes):
         routes.append(("pollinations", "openai"))
     return routes
@@ -129,6 +132,8 @@ def get_upstream_model(model_name: str, provider: str) -> str:
             "kimi": "moonshotai/Kimi-K2.6",
             "nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
             "step": "stepfun-ai/Step-3.5-Flash",
+            "gpt": "deepseek-ai/DeepSeek-V4-Pro",
+            "openai": "deepseek-ai/DeepSeek-V4-Pro",
         }
         for key, val in family_map.items():
             if key in stripped.lower():
