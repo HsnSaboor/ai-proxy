@@ -33,11 +33,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI Proxy", version="0.3.0", lifespan=lifespan)
 
+from anthropic import router as anthropic_router
 from chat import router as chat_router
 from media import router as media_router
 
 app.include_router(chat_router)
 app.include_router(media_router)
+app.include_router(anthropic_router)
 
 
 @app.get("/v1/models")
