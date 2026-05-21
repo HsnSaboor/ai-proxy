@@ -105,9 +105,14 @@ def _openai_to_anthropic(data: dict, model: str) -> dict:
     if tool_calls:
         for tc in tool_calls:
             fn = tc.get("function", {})
-            content_blocks.append({"type": "tool_use", "id": tc.get("id", ""), "name": fn.get("name", ""), "input": json.loads(fn.get("arguments", "{}"))})
+            try:
+                parsed = json.loads(fn.get("arguments", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                parsed = {}
+            content_blocks.append({"type": "tool_use", "id": tc.get("id", ""), "name": fn.get("name", ""), "input": parsed})
+    usage = data.get("usage", {})
     return {
-        "id": data.get("id", f"msg_{int(time.time())}"),
+        "id": f"msg_{int(time.time())}",
         "type": "message",
         "role": "assistant",
         "content": content_blocks,
@@ -115,8 +120,10 @@ def _openai_to_anthropic(data: dict, model: str) -> dict:
         "stop_reason": STOP_MAP.get(choice.get("finish_reason", ""), choice.get("finish_reason")),
         "stop_sequence": choice.get("stop_sequence"),
         "usage": {
-            "input_tokens": data.get("usage", {}).get("prompt_tokens", 0),
-            "output_tokens": data.get("usage", {}).get("completion_tokens", 0),
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
         },
     }
 
@@ -179,14 +186,16 @@ async def _anthropic_stream(
         resp, error = await try_provider_stream(client, provider, body_for_route)
         if resp is not None and resp.status_code == 200:
             msg_id = f"msg_{int(time.time())}"
-            yield f"event: message_start\ndata: {json.dumps({'type': 'message_start','message':{'id':msg_id,'type':'message','role':'assistant','content':[],'model':original_model,'stop_reason':None,'stop_sequence':None,'usage':{'input_tokens':0,'output_tokens':0}}})}\n\n"
+            yield f"event: message_start\ndata: {json.dumps({'type':'message_start','message':{'id':msg_id,'type':'message','role':'assistant','content':[],'model':original_model,'stop_reason':None,'stop_sequence':None,'usage':{'input_tokens':0,'output_tokens':1,'cache_creation_input_tokens':0,'cache_read_input_tokens':0}}})}\n\n"
             yield f"event: content_block_start\ndata: {json.dumps({'type':'content_block_start','index':0,'content_block':{'type':'text','text':''}})}\n\n"
-            text_buffer = ""
+            ended = False
             try:
                 async for line in resp.aiter_lines():
+                    if ended:
+                        break
                     if line.startswith("data: ") and line != "data: [DONE]":
-                        payload = line[6:]
-                        if not payload.strip():
+                        payload = line[6:].strip()
+                        if not payload:
                             continue
                         try:
                             obj = json.loads(payload)
@@ -195,13 +204,14 @@ async def _anthropic_stream(
                                 delta = choices[0].get("delta", {}) or {}
                                 content = delta.get("content", "")
                                 if content:
-                                    text_buffer += content
                                     yield f"event: content_block_delta\ndata: {json.dumps({'type':'content_block_delta','index':0,'delta':{'type':'text_delta','text':content}})}\n\n"
                                 finish = choices[0].get("finish_reason")
                                 if finish:
-                                    usage = obj.get("usage", {})
+                                    ended = True
                                     yield f"event: content_block_stop\ndata: {json.dumps({'type':'content_block_stop','index':0})}\n\n"
-                                    yield f"event: message_delta\ndata: {json.dumps({'type':'message_delta','delta':{'stop_reason':STOP_MAP.get(finish,finish),'stop_sequence':None},'usage':{'output_tokens':usage.get('completion_tokens',0)}})}\n\n"
+                                    usage = obj.get("usage", {})
+                                    ot = max(usage.get("completion_tokens", 0), 1)
+                                    yield f"event: message_delta\ndata: {json.dumps({'type':'message_delta','delta':{'stop_reason':STOP_MAP.get(finish,finish),'stop_sequence':None},'usage':{'output_tokens':ot,'cache_creation_input_tokens':0,'cache_read_input_tokens':0}})}\n\n"
                                     yield f"event: message_stop\ndata: {json.dumps({'type':'message_stop'})}\n\n"
                         except json.JSONDecodeError:
                             pass
