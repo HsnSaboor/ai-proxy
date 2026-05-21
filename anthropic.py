@@ -72,6 +72,15 @@ def _translate_tools(tools: list[dict] | None) -> list[dict] | None:
                 "type": "function",
                 "function": {"name": fn.get("name", t.get("name", "")), "description": fn.get("description", ""), "parameters": fn.get("parameters", {})},
             })
+        elif t.get("input_schema"):
+            out.append({
+                "type": "function",
+                "function": {
+                    "name": t.get("name", ""),
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {}),
+                },
+            })
         else:
             out.append(t)
     return out
