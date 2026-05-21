@@ -1,0 +1,17 @@
+[project]
+name = "g4f-proxy"
+version = "0.1.0"
+description = "Unlimited reverse proxy for g4f.dev AI models"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "pydantic",
+    "python-multipart>=0.0.29",
+]
+
+[project.scripts]
+g4f-proxy = "main:app"
+
